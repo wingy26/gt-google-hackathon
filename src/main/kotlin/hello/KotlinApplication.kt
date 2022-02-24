@@ -20,6 +20,12 @@ class KotlinApplication {
         val findingAlgorithm: (myState: PlayerState, distance: Int) -> (itState: PlayerState) -> Boolean
     )
 
+    private class HitState(
+        val status: String,
+        val targetPlayer: PlayerState?,
+        val distance: Int
+    )
+
     companion object {
         private const val HIT = "H"
         private const val BLOCK = "B"
@@ -77,12 +83,37 @@ class KotlinApplication {
                 val currentHitState = findHitCountAtState(myState, arenaUpdate.arena)
                 val willBeHitCount = currentHitState.values.count { it.first == HIT }
 
+                val myStateDirection = directions[myState.direction]!!
+                val forward = currentHitState[myStateDirection.direction]
+                val back = currentHitState[myStateDirection.beingHitDirection]
+                val left = currentHitState[myStateDirection.left]
+                val right = currentHitState[myStateDirection.right]
                 val response = when (willBeHitCount) {
-                    0, 1 -> {
+                    0 -> {
                         when {
-                            currentHitState[myState.direction]?.first.isBlockOrHit() -> "T"
-                            currentHitState[directions[myState.direction]!!.left]?.first.isBlockOrHit() -> "L"
-                            currentHitState[directions[myState.direction]!!.right]?.first.isBlockOrHit() -> "R"
+                            forward?.first.isBlockOrHit() -> "T"
+                            left?.first.isBlockOrHit() -> "L"
+                            right?.first.isBlockOrHit() -> "R"
+                            // Check boundary
+                            myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
+                            myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
+                            myState.direction == WEST && myState.x == 0 -> if (myState.y == 0) "L" else "R"
+                            myState.direction == EAST && myState.x == arenaUpdate.arena.dims[0] -> if (myState.y == 0) "R" else "L"
+
+                            else -> "F"
+                        }
+                    }
+                    1 -> {
+                        when {
+                            forward?.first == HIT -> "T"
+                            left?.first == HIT -> "L"
+                            right?.first == HIT -> "R"
+                            left?.first == BLOCK -> "L"
+                            right?.first == BLOCK -> "R"
+                            back?.first == HIT
+                                    && back.second == 3
+                                    && (forward?.second ?: 3) > 1
+                            -> "F"
                             // Check boundary
                             myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
                             myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
@@ -93,8 +124,8 @@ class KotlinApplication {
                         }
                     }
                     else -> {
-                        val forwardState = currentHitState[myState.direction]!!
-                        if ((forwardState.first.isBlockOrHit()) && forwardState.second == 1) {
+                        // Need to run
+                        if (forward?.first.isBlockOrHit() && forward?.second == 1) {
                             // Blocked, turn left or right
                             when(myState.direction) {
                                 NORTH-> if (myState.x != 0) "L" else "R"
