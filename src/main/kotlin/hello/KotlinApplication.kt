@@ -116,9 +116,9 @@ class KotlinApplication {
                             -> "F"
                             // Check boundary
                             myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
-                            myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
+                            myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] - 1 -> if (myState.x != 0) "R" else "L"
                             myState.direction == WEST && myState.x == 0 -> if (myState.y == 0) "L" else "R"
-                            myState.direction == EAST && myState.x == arenaUpdate.arena.dims[0] -> if (myState.y == 0) "R" else "L"
+                            myState.direction == EAST && myState.x == arenaUpdate.arena.dims[0] - 1 -> if (myState.y == 0) "R" else "L"
 
                             else -> "F"
                         }
@@ -130,8 +130,8 @@ class KotlinApplication {
                             when(myState.direction) {
                                 NORTH-> if (myState.x != 0) "L" else "R"
                                 SOUTH -> if (myState.x != 0) "R" else "L"
-                                WEST -> if (myState.y == 0) "L" else "R"
-                                EAST -> if (myState.y == 0) "R" else "L"
+                                WEST -> if (myState.y != arenaUpdate.arena.dims[1] - 1) "L" else "R"
+                                EAST -> if (myState.y != arenaUpdate.arena.dims[1] - 1) "R" else "L"
                                 else -> "F"
                             }
                         } else {
