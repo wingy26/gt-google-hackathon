@@ -79,34 +79,24 @@ class KotlinApplication {
 
                 val response = when (willBeHitCount) {
                     0, 1 -> {
+                        // Find the target
                         when {
-                            currentHitState[myState.direction]?.first == BLOCK -> "T"
-                            currentHitState[directions[myState.direction]!!.left]?.first == BLOCK -> "L"
-                            currentHitState[directions[myState.direction]!!.right]?.first == BLOCK -> "R"
-                            // Check boundary
-                            myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
-                            myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
-                            myState.direction == WEST && myState.x == 0 -> if (myState.y == 0) "L" else "R"
-                            myState.direction == EAST && myState.x == arenaUpdate.arena.dims[0] -> if (myState.y == 0) "R" else "L"
-
-                            else -> "F"
-                        }
-                    }
-                    else -> {
-                        val forwardState = currentHitState[myState.direction]!!
-                        if ((forwardState.first == HIT || forwardState.first == BLOCK) && forwardState.second == 1) {
-                            // Blocked, turn left or right
-                            when(myState.direction) {
-                                NORTH-> if (myState.x != 0) "L" else "R"
-                                SOUTH -> if (myState.x != 0) "R" else "L"
-                                WEST -> if (myState.y == 0) "L" else "R"
-                                EAST -> if (myState.y == 0) "R" else "L"
-                                else -> "F"
+                            // FOUND
+                            currentHitState[myState.direction]?.first.isBlockOrHit() -> "T"
+                            currentHitState[directions[myState.direction]!!.left]?.first.isBlockOrHit() && currentHitState[directions[myState.direction]!!.right]?.first.isBlockOrHit() -> {
+                                if (currentHitState[directions[myState.direction]!!.left]!!.second!!.score > currentHitState[directions[myState.direction]!!.right]!!.second!!.score) {
+                                    "L"
+                                } else {
+                                    "R"
+                                }
                             }
-                        } else {
-                            "F"
+                            currentHitState[directions[myState.direction]!!.left]?.first.isBlockOrHit() -> "L"
+                            currentHitState[directions[myState.direction]!!.right]?.first.isBlockOrHit() -> "R"
+                            // NOT FOUND
+                            else -> escapeIfPossible(myState, arenaUpdate.arena, currentHitState)
                         }
                     }
+                    else -> escapeIfPossible(myState, arenaUpdate.arena, currentHitState)
                 }
 
                 ServerResponse.ok().body(Mono.just(response))
@@ -114,23 +104,59 @@ class KotlinApplication {
         }
     }
 
-    private fun findHitCountAtState(myState: PlayerState, arena: Arena): Map<String, Pair<String, Int>> {
+    private fun escapeIfPossible(
+        myState: PlayerState,
+        arena: Arena,
+        currentHitState: Map<String, Pair<String, PlayerState?>>
+    ): String {
+        val forwardState = currentHitState[myState.direction]!!
+        return when {
+            // NOT FOUND
+            // Check boundary
+            myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
+            myState.direction == SOUTH && myState.y == arena.dims[1] -> if (myState.x != 0) "R" else "L"
+            myState.direction == WEST && myState.x == 0 -> if (myState.y == 0) "L" else "R"
+            myState.direction == EAST && myState.x == arena.dims[0] -> if (myState.y == 0) "R" else "L"
+            (forwardState.first.isBlockOrHit()) && calDistance(myState, forwardState.second!!) == 1 -> {
+                when (myState.direction) {
+                    NORTH -> if (myState.x != 0) "L" else "R"
+                    SOUTH -> if (myState.x != 0) "R" else "L"
+                    WEST -> if (myState.y == 0) "L" else "R"
+                    EAST -> if (myState.y == 0) "R" else "L"
+                    else -> "F"
+                }
+            }
+            else -> "F" // RUN!!!
+        }
+    }
+
+    private fun String?.isBlockOrHit(): Boolean {
+        return this == HIT || this == BLOCK
+    }
+
+    // Only if they are in the line
+    private fun calDistance(state1: PlayerState, state2: PlayerState): Int {
+        return kotlin.math.abs(state1.x - state2.x + state1.y - state2.y)
+    }
+
+    private fun findHitCountAtState(myState: PlayerState, arena: Arena): Map<String, Pair<String, PlayerState?>> {
         val targetedPlayers = arena.state.values
             .filter {
                 (it.x == myState.x && it.y in (myState.y - 3)..(myState.y + 3))
                         || (it.y == myState.y && it.x in (myState.x - 3)..(myState.x + 3))
             }
 
-        val currentHitState = mutableMapOf<String, Pair<String, Int>>()
+        val currentHitState = mutableMapOf<String, Pair<String, PlayerState?>>()
         (1..3).forEach { distance ->
             directions.values.forEach { direction ->
-                val hit = targetedPlayers.find(direction.findingAlgorithm(myState, distance))?.direction
+                val targetedPlayer = targetedPlayers.find(direction.findingAlgorithm(myState, distance))
+                val hit = targetedPlayer?.direction
 
                 if (currentHitState[direction.direction]?.first != HIT && currentHitState[direction.direction]?.first != BLOCK) {
                     when (hit) {
-                        direction.beingHitDirection -> currentHitState[direction.direction] = HIT to distance
-                        null -> currentHitState[direction.direction] = EMPTY to distance
-                        else -> currentHitState[direction.direction] = BLOCK to distance
+                        direction.beingHitDirection -> currentHitState[direction.direction] = HIT to targetedPlayer
+                        null -> currentHitState[direction.direction] = EMPTY to targetedPlayer
+                        else -> currentHitState[direction.direction] = BLOCK to targetedPlayer
                     }
                 }
             }
