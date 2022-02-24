@@ -79,10 +79,18 @@ class KotlinApplication {
 
                 val response = when (willBeHitCount) {
                     0, 1 -> {
-                        if (currentHitState[myState.direction] == BLOCK) "T"
-                        else if (currentHitState[directions[myState.direction]!!.left] == BLOCK) "L"
-                        else if (currentHitState[directions[myState.direction]!!.right] == BLOCK) "R"
-                        else "F"
+                        when {
+                            currentHitState[myState.direction] == BLOCK -> "T"
+                            currentHitState[directions[myState.direction]!!.left] == BLOCK -> "L"
+                            currentHitState[directions[myState.direction]!!.right] == BLOCK -> "R"
+                            // Check boundary
+                            myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
+                            myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
+                            myState.direction == WEST && myState.x == 0 -> if (myState.y == 0) "L" else "R"
+                            myState.direction == EAST && myState.x == arenaUpdate.arena.dims[0] -> if (myState.y == 0) "R" else "L"
+
+                            else -> "F"
+                        }
                     }
                     else -> "F"
                 }
