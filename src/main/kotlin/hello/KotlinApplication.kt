@@ -75,14 +75,14 @@ class KotlinApplication {
             request.bodyToMono(ArenaUpdate::class.java).flatMap { arenaUpdate ->
                 val myState = arenaUpdate.arena.state[arenaUpdate._links.self.href]!!
                 val currentHitState = findHitCountAtState(myState, arenaUpdate.arena)
-                val willBeHitCount = currentHitState.values.count { it == HIT }
+                val willBeHitCount = currentHitState.values.count { it.first == HIT }
 
                 val response = when (willBeHitCount) {
                     0, 1 -> {
                         when {
-                            currentHitState[myState.direction] == BLOCK -> "T"
-                            currentHitState[directions[myState.direction]!!.left] == BLOCK -> "L"
-                            currentHitState[directions[myState.direction]!!.right] == BLOCK -> "R"
+                            currentHitState[myState.direction]?.first == BLOCK -> "T"
+                            currentHitState[directions[myState.direction]!!.left]?.first == BLOCK -> "L"
+                            currentHitState[directions[myState.direction]!!.right]?.first == BLOCK -> "R"
                             // Check boundary
                             myState.direction == NORTH && myState.y == 0 -> if (myState.x != 0) "L" else "R"
                             myState.direction == SOUTH && myState.y == arenaUpdate.arena.dims[1] -> if (myState.x != 0) "R" else "L"
@@ -92,7 +92,21 @@ class KotlinApplication {
                             else -> "F"
                         }
                     }
-                    else -> "F"
+                    else -> {
+                        val forwardState = currentHitState[myState.direction]!!
+                        if ((forwardState.first == HIT || forwardState.first == BLOCK) && forwardState.second == 1) {
+                            // Blocked, turn left or right
+                            when(myState.direction) {
+                                NORTH-> if (myState.x != 0) "L" else "R"
+                                SOUTH -> if (myState.x != 0) "R" else "L"
+                                WEST -> if (myState.y == 0) "L" else "R"
+                                EAST -> if (myState.y == 0) "R" else "L"
+                                else -> "F"
+                            }
+                        } else {
+                            "F"
+                        }
+                    }
                 }
 
                 ServerResponse.ok().body(Mono.just(response))
@@ -100,23 +114,23 @@ class KotlinApplication {
         }
     }
 
-    private fun findHitCountAtState(myState: PlayerState, arena: Arena): Map<String, String> {
+    private fun findHitCountAtState(myState: PlayerState, arena: Arena): Map<String, Pair<String, Int>> {
         val targetedPlayers = arena.state.values
             .filter {
                 (it.x == myState.x && it.y in (myState.y - 3)..(myState.y + 3))
                         || (it.y == myState.y && it.x in (myState.x - 3)..(myState.x + 3))
             }
 
-        val currentHitState = mutableMapOf<String, String>()
+        val currentHitState = mutableMapOf<String, Pair<String, Int>>()
         (1..3).forEach { distance ->
             directions.values.forEach { direction ->
                 val hit = targetedPlayers.find(direction.findingAlgorithm(myState, distance))?.direction
 
-                if (currentHitState[direction.direction] != HIT && currentHitState[direction.direction] != BLOCK) {
+                if (currentHitState[direction.direction]?.first != HIT && currentHitState[direction.direction]?.first != BLOCK) {
                     when (hit) {
-                        direction.beingHitDirection -> currentHitState[direction.direction] = HIT
-                        null -> currentHitState[direction.direction] = EMPTY
-                        else -> currentHitState[direction.direction] = BLOCK
+                        direction.beingHitDirection -> currentHitState[direction.direction] = HIT to distance
+                        null -> currentHitState[direction.direction] = EMPTY to distance
+                        else -> currentHitState[direction.direction] = BLOCK to distance
                     }
                 }
             }
