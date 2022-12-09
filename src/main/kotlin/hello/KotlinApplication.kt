@@ -105,7 +105,7 @@ class KotlinApplication {
                     }
                     1 -> {
                         when {
-                            forward?.first == HIT && myStateDirection.direction != NORTH -> "T"
+                            forward?.first == HIT -> "T"
                             left?.first == HIT -> "L"
                             right?.first == HIT -> "R"
                             left?.first == BLOCK -> "L"
